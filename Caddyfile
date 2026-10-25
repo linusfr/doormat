@@ -1,0 +1,10 @@
+{
+	admin off
+	persist_config off
+	# TLS is the job of the proxy in front.
+	auto_https off
+}
+
+:{$DOORMAT_PORT:8080} {
+	import doormat.caddy
+}

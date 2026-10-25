@@ -1,0 +1,18 @@
+# The site itself, imported by Caddyfile (the image) and dev/Caddyfile (`just dev`).
+root * {$DOORMAT_ROOT:/srv}
+
+# Icons are public so home-screen shortcuts can load them without a session.
+@static path /favicon.svg /apple-touch-icon.png /icons/*
+handle @static {
+	header Cache-Control "public, max-age=86400"
+	file_server
+}
+
+handle {
+	# The page differs per user, so no cache may keep it.
+	header Cache-Control "private, no-store"
+	# Every path renders index.html, so apps.md itself is never served.
+	rewrite * /index.html
+	templates
+	file_server
+}

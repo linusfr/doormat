@@ -1,0 +1,11 @@
+# `just dev` assembles the served tree here from site/ and examples/.
+dev/srv/
+test/srv/
+
+# AI context files
+CLAUDE.md
+AGENTS.md
+.ai-session-state.md
+
+# OS
+.DS_Store

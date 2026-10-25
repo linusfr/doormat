@@ -1,0 +1,113 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Gate 1: hooks, the template's behaviour, and the next version number ───
+  # The version is computed with --dry so nothing is tagged yet. Tagging before
+  # the build is what leaves orphan releases behind when a build breaks.
+  checks:
+    name: checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.semrel.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install Hermit
+        run: curl -fsSL https://github.com/cashapp/hermit/releases/download/stable/install.sh | /bin/bash
+
+      - name: Hooks, smoke test, config validation
+        run: |
+          source bin/activate-hermit
+          just check
+
+      - name: Next version (dry run — tags nothing)
+        id: semrel
+        uses: go-semantic-release/action@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Tags are bare: 1.2.3, not v1.2.3. The "v" is hardcoded in the GitHub
+          # provider and strip_v_tag_prefix is the documented way out.
+          custom-arguments: '--provider-opt strip_v_tag_prefix=true'
+          dry: true
+
+  # ── Gate 2: the image behaves like the local caddy did ─────────────────────
+  # Catches what `just test` cannot: the Dockerfile's paths, and running as nobody.
+  image:
+    name: image
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Hermit
+        run: curl -fsSL https://github.com/cashapp/hermit/releases/download/stable/install.sh | /bin/bash
+
+      - name: Build and smoke test the image
+        run: |
+          source bin/activate-hermit
+          just image-test
+
+  # ── Only now is anything tagged, released or published ─────────────────────
+  release:
+    name: release
+    needs: [checks, image]
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      github.event_name != 'pull_request' &&
+      needs.checks.outputs.version != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Tag and create the release
+        uses: go-semantic-release/action@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          custom-arguments: '--provider-opt strip_v_tag_prefix=true'
+          changelog-file: CHANGELOG.md
+
+      # The Dockerfile has no RUN step, so building for arm64 needs no emulation:
+      # every layer is the multi-arch caddy base plus copied files.
+      - name: Publish the image
+        env:
+          VERSION: ${{ needs.checks.outputs.version }}
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          image=ghcr.io/${{ github.repository_owner }}/doormat
+          docker buildx create --use
+          docker buildx build . \
+            --platform linux/amd64,linux/arm64 \
+            --label org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }} \
+            --label org.opencontainers.image.version="$VERSION" \
+            --label org.opencontainers.image.licenses=MIT \
+            -t "$image:$VERSION" -t "$image:latest" \
+            --push
+
+      - name: Commit the changelog
+        env:
+          VERSION: ${{ needs.checks.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git diff --cached --quiet || git commit -m "chore(release): ${VERSION} [skip ci]"
+          git push

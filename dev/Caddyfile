@@ -1,0 +1,12 @@
+# `just dev`: stands in for the auth proxy by setting the headers it would forward.
+{
+	admin off
+	persist_config off
+	auto_https off
+}
+
+:{$DOORMAT_PORT:8080} {
+	request_header Remote-Groups "{$DEV_GROUPS}"
+	request_header Remote-Name "{$DEV_NAME}"
+	import ../doormat.caddy
+}
