@@ -1,10 +1,12 @@
 {{- /* Weather from Open-Meteo (no API key). Location, one of: postcode + country (OpenStreetMap's
        Nominatim, looked up once per browser),
-       city with optional country (Open-Meteo geocoding), or latitude + longitude. Also: name (label,
-       default: the place found), unit: celsius (default) or fahrenheit. The browser fetches it, so a
+       city with optional country (Open-Meteo geocoding), or latitude + longitude. locate: browser
+       uses each viewer's own position once they allow it, with the configured place as fallback.
+       Also: name (label of the configured place, default: the place found), unit: celsius (default)
+       or fahrenheit. The browser fetches it, so a
        failed lookup or fetch only hides the module. */ -}}
 {{- define "module-weather" }}
-<div class="module weather" data-postcode="{{ .postcode | default "" | html }}" data-country="{{ .country | default "" | html }}" data-city="{{ .city | default "" | html }}" data-latitude="{{ .latitude | default "" | html }}" data-longitude="{{ .longitude | default "" | html }}" data-unit="{{ .unit | default "celsius" | html }}" data-name="{{ .name | default "" | html }}" hidden>
+<div class="module weather" data-postcode="{{ .postcode | default "" | html }}" data-country="{{ .country | default "" | html }}" data-city="{{ .city | default "" | html }}" data-latitude="{{ .latitude | default "" | html }}" data-longitude="{{ .longitude | default "" | html }}" data-unit="{{ .unit | default "celsius" | html }}" data-name="{{ .name | default "" | html }}" data-locate="{{ .locate | default "" | html }}" hidden>
 	<span class="weather-icon" aria-hidden="true"></span>
 	<span class="weather-text"></span>
 </div>
@@ -70,14 +72,38 @@
 			return found;
 		};
 
-		document.querySelectorAll(".weather:not([data-init])").forEach(async el => {
-			el.dataset.init = "";
-			const { unit, name } = el.dataset;
-			let where;
-			try { where = await locate(el.dataset); } catch (e) {}
-			if (!where) return;
+		// locate: browser. The position is rounded to about a kilometre and kept for an hour, so the
+		// permission prompt and the lookup happen rarely; the place name for it is kept for good.
+		const fromBrowser = async () => {
+			const hit = cached("doormat-geo", 60 * 60 * 1000);
+			if (valid(hit)) return hit;
+			if (!navigator.geolocation) return null;
+			try {
+				if ((await navigator.permissions?.query({ name: "geolocation" }))?.state === "denied") return null;
+			} catch (e) {}
+			const pos = await new Promise(resolve => navigator.geolocation.getCurrentPosition(
+				p => resolve(p.coords), () => resolve(null), { timeout: 15000, maximumAge: 60 * 60 * 1000 }));
+			if (!pos) return null;
+			const latitude = pos.latitude.toFixed(2), longitude = pos.longitude.toFixed(2);
+			const placeKey = `doormat-place:${latitude},${longitude}`;
+			let place = cached(placeKey, Infinity);
+			if (place === undefined) {
+				try {
+					const a = (await json("https://nominatim.openstreetmap.org/reverse?" + new URLSearchParams({
+						lat: latitude, lon: longitude, format: "jsonv2", zoom: "10",
+					}))).address || {};
+					place = a.city || a.town || a.village || a.suburb || "";
+					store(placeKey, place);
+				} catch (e) { place = ""; }
+			}
+			const found = { latitude, longitude, place };
+			store("doormat-geo", found);
+			return found;
+		};
+
+		const show = async (el, where, label) => {
 			const { latitude, longitude } = where;
-			const label = name || where.place;
+			const { unit } = el.dataset;
 			const key = `doormat-weather:${latitude},${longitude},${unit}`;
 			let data = cached(key, 15 * 60 * 1000);
 			if (!data) {
@@ -99,6 +125,21 @@
 			el.querySelector(".weather-text").textContent =
 				`${t(data.current.temperature_2m)} ${text}${label ? " in " + label : ""} · H ${t(data.daily.temperature_2m_max[0])} L ${t(data.daily.temperature_2m_min[0])}`;
 			el.hidden = false;
+		};
+
+		document.querySelectorAll(".weather:not([data-init])").forEach(async el => {
+			el.dataset.init = "";
+			const { name, locate: mode } = el.dataset;
+			// The configured place shows first, so nobody waits on the permission prompt; a browser
+			// position replaces it once there is one. The configured name only fits the configured place.
+			const browser = mode === "browser" && cached("doormat-geo", 60 * 60 * 1000);
+			if (valid(browser)) return show(el, browser, browser.place);
+			let configured;
+			try { configured = await locate(el.dataset); } catch (e) {}
+			if (configured) await show(el, configured, name || configured.place);
+			if (mode !== "browser") return;
+			const here = await fromBrowser();
+			if (here) show(el, here, here.place);
 		});
 	})();
 </script>

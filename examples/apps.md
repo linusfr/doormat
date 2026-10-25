@@ -7,8 +7,10 @@
 # modules:  optional widgets under the date, in this order. Each names its module and takes
 #           that module's parameters:
 #           weather: where, as postcode + country, city (+ country), or latitude + longitude;
-#           name (label, default: the place found); unit (celsius or fahrenheit). Fetched by the
-#           browser from open-meteo.com; postcodes are looked up once at OpenStreetMap.
+#           locate: browser to use each viewer's own position once they allow it, the place above
+#           being the fallback; name (label of that place, default: the place found); unit
+#           (celsius or fahrenheit). Fetched by the browser from open-meteo.com; places are looked
+#           up once at OpenStreetMap.
 # search:   false leaves out the search box.
 # labels:   filter chips. badge: true also shows the label on the tile. requires: a group the
 #           user needs on top of the app's own group before the tile shows (DOORMAT_AUTH=headers).
@@ -23,6 +25,7 @@ title: Start
 
 modules:
   - module: weather
+    locate: browser
     postcode: "10115"
     country: de
 

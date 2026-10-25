@@ -71,7 +71,8 @@ and takes that module's parameters:
 ```yaml
 modules:
   - module: weather   # Open-Meteo, fetched by the browser; no API key
-    postcode: "10115" # or city: Hamburg, or latitude/longitude
+    locate: browser   # optional: each viewer's own position, once they allow it
+    postcode: "10115" # fallback, or city: Hamburg, or latitude/longitude
     country: de
 ```
 
