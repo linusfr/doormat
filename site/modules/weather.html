@@ -1,4 +1,5 @@
-{{- /* Weather from Open-Meteo (no API key). Location, one of: postcode + country (zippopotam.us),
+{{- /* Weather from Open-Meteo (no API key). Location, one of: postcode + country (OpenStreetMap's
+       Nominatim, looked up once per browser),
        city with optional country (Open-Meteo geocoding), or latitude + longitude. Also: name (label,
        default: the place found), unit: celsius (default) or fahrenheit. The browser fetches it, so a
        failed lookup or fetch only hides the module. */ -}}
@@ -41,22 +42,30 @@
 		const store = (key, data) => { try { localStorage.setItem(key, JSON.stringify({ at: Date.now(), data })); } catch (e) {} };
 		const json = async url => { const res = await fetch(url); if (!res.ok) throw new Error(res.status); return res.json(); };
 
+		// Never show weather for coordinates that cannot be right; that includes lookups cached by
+		// an earlier version, which are looked up again.
+		const valid = p => p && Math.abs(Number(p.latitude)) <= 90 && Math.abs(Number(p.longitude)) <= 180;
+
 		// A place does not move, so a lookup is kept for good.
 		const locate = async ({ postcode, country, city, latitude, longitude }) => {
 			if (latitude && longitude) return { latitude, longitude, place: "" };
 			const key = `doormat-place:${postcode}|${city}|${country}`;
 			const hit = cached(key, Infinity);
-			if (hit) return hit;
+			if (valid(hit)) return hit;
 			let found;
 			if (postcode && country) {
-				const p = (await json(`https://api.zippopotam.us/${encodeURIComponent(country.toLowerCase())}/${encodeURIComponent(postcode)}`)).places[0];
-				found = { latitude: p.latitude, longitude: p.longitude, place: p["place name"] };
+				const p = (await json("https://nominatim.openstreetmap.org/search?" + new URLSearchParams({
+					postalcode: postcode, countrycodes: country.toLowerCase(), format: "jsonv2", limit: "1", addressdetails: "1",
+				})))[0];
+				const a = p.address || {};
+				found = { latitude: p.lat, longitude: p.lon, place: a.city || a.town || a.village || a.suburb || "" };
 			} else if (city) {
 				const params = { name: city, count: "1" };
 				if (country) params.countryCode = country.toUpperCase();
 				const r = (await json("https://geocoding-api.open-meteo.com/v1/search?" + new URLSearchParams(params))).results[0];
 				found = { latitude: r.latitude, longitude: r.longitude, place: r.name };
 			} else return null;
+			if (!valid(found)) return null;
 			store(key, found);
 			return found;
 		};

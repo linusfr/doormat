@@ -8,7 +8,7 @@
 #           that module's parameters:
 #           weather: where, as postcode + country, city (+ country), or latitude + longitude;
 #           name (label, default: the place found); unit (celsius or fahrenheit). Fetched by the
-#           browser from open-meteo.com; postcodes are looked up at zippopotam.us.
+#           browser from open-meteo.com; postcodes are looked up once at OpenStreetMap.
 # search:   false leaves out the search box.
 # labels:   filter chips. badge: true also shows the label on the tile. requires: a group the
 #           user needs on top of the app's own group before the tile shows (DOORMAT_AUTH=headers).
