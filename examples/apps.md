@@ -10,7 +10,7 @@
 #           DOORMAT_GROUP_FORMAT applied to the slug (default: <slug>:member).
 #   icon:   a slug from https://github.com/homarr-labs/dashboard-icons, a path under /srv
 #           (icons/foo.png), or a full URL. Without one, the tile shows the first letter.
-#   health: shows a status dot. true checks url, a path checks that path on url's host, or a
+#   health: marks the tile when the app is down. true checks url, a path checks that path on url's host, or a
 #           full URL (e.g. an internal address). Any response below HTTP 500 counts as up.
 title: Start
 

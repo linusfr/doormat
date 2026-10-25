@@ -58,7 +58,7 @@ start.example.com {
 
 ## Health
 
-Add `health` to a tile for a status dot: `true` checks its `url`, `/path` checks that path on
+Add `health` to a tile to have it marked when the app is down: `true` checks its `url`, `/path` checks that path on
 the same host, a full URL checks anything else, such as an internal address. Any response below
 HTTP 500 within 5 seconds counts as up, so login redirects and 401s do too. doormat runs the
 checks itself; the page only shows their last result.

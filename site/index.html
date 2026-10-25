@@ -64,6 +64,7 @@
 		--muted: #5d6478;
 		/* Darkest surface it sits on is its own 14% tint; this keeps that above 4.5:1. */
 		--accent: #3651e0;
+		--down: #b3263a;
 		--shadow: 0 1px 2px rgba(20, 24, 40, 0.06), 0 8px 24px rgba(20, 24, 40, 0.06);
 		--shadow-hover: 0 2px 4px rgba(20, 24, 40, 0.08), 0 16px 40px rgba(20, 24, 40, 0.12);
 		color-scheme: light;
@@ -79,6 +80,7 @@
 			--text: #eef0f7;
 			--muted: #9aa1b5;
 			--accent: #8ea2ff;
+			--down: #ff8a95;
 			--shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 			--shadow-hover: 0 12px 32px rgba(0, 0, 0, 0.45);
 			color-scheme: dark;
@@ -143,7 +145,6 @@
 	}
 	.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
 	.tile {
-		position: relative;
 		display: flex; align-items: center; gap: 14px;
 		padding: 16px;
 		border-radius: 16px;
@@ -165,19 +166,18 @@
 	.icon img { width: 30px; height: 30px; object-fit: contain; }
 	.icon span { font-weight: 700; font-size: 18px; color: var(--accent); }
 	.name { font-weight: 600; letter-spacing: -0.01em; }
-	.desc { color: var(--muted); font-size: 13px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	/* Badges and status lead the description line, so the name never wraps for them. */
+	.desc { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; margin-top: 2px; min-width: 0; }
+	.desc-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 	.meta { min-width: 0; }
 	.badge {
-		display: inline-block; margin-left: 8px; padding: 1px 6px; border-radius: 6px;
-		font-size: 11px; font-weight: 700; letter-spacing: 0.06em; vertical-align: 1px;
+		flex: none; padding: 1px 6px; border-radius: 6px;
+		font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
 		color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent);
 	}
-	.dot {
-		position: absolute; top: 12px; right: 12px; width: 8px; height: 8px; border-radius: 50%;
-		background: var(--muted); opacity: 0.5;
-	}
-	.dot[data-health="up"] { background: #16a34a; opacity: 1; }
-	.dot[data-health="down"] { background: #d4495b; opacity: 1; box-shadow: 0 0 0 3px color-mix(in srgb, #d4495b 25%, transparent); }
+	.badge.down { color: var(--down); background: color-mix(in srgb, var(--down) 14%, transparent); }
+	/* Up is the normal case and shows nothing; only a down app changes the tile. */
+	.tile[data-health="down"] .icon { filter: grayscale(1); opacity: 0.5; }
 	.empty { color: var(--muted); margin-top: 48px; text-align: center; }
 	footer { margin-top: 56px; display: flex; gap: 20px; justify-content: center; font-size: 13px; }
 	footer a { color: var(--muted); text-decoration: none; }
@@ -251,7 +251,8 @@
 			<h2>{{ .name | html }}</h2>
 			<div class="grid">
 			{{- range .apps }}
-				<a class="tile" href="{{ .url | html }}" data-labels="{{ join " " (.labels | default list) | html }}" data-search="{{ printf "%s %s" .name .description | lower | html }}">
+				{{- $health := health .health .url }}
+				<a class="tile" href="{{ .url | html }}"{{ if $health }} data-health="{{ $health }}"{{ end }} data-labels="{{ join " " (.labels | default list) | html }}" data-search="{{ printf "%s %s" .name .description | lower | html }}">
 					<div class="icon">
 						{{- if .icon }}
 						<img src="{{ if hasPrefix "http" .icon }}{{ .icon | html }}{{ else if contains "/" .icon }}/{{ .icon | html }}{{ else }}https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/{{ .icon | html }}.svg{{ end }}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:this.dataset.i}))" data-i="{{ substr 0 1 .name | html }}">
@@ -259,12 +260,13 @@
 						<span>{{ substr 0 1 .name | html }}</span>
 						{{- end }}
 					</div>
-					{{- with health .health .url }}
-					<span class="dot" data-health="{{ . }}" role="img" aria-label="{{ if eq . "up" }}Up{{ else if eq . "down" }}Down{{ else }}Not checked yet{{ end }}" title="{{ if eq . "up" }}Up{{ else if eq . "down" }}Down{{ else }}Not checked yet{{ end }}"></span>
-					{{- end }}
 					<div class="meta">
-						<div class="name">{{ .name | html }}{{ range .labels }}{{ if dig . "badge" false $labelDefs }}<span class="badge" title="{{ dig . "description" "" $labelDefs | html }}">{{ dig . "title" (upper .) $labelDefs | html }}</span>{{ end }}{{ end }}</div>
-						{{- if .description }}<div class="desc">{{ .description | html }}</div>{{ end }}
+						<div class="name">{{ .name | html }}</div>
+						<div class="desc">
+							{{- if eq $health "down" }}<span class="badge down">Down</span>{{ end }}
+							{{- range .labels }}{{ if dig . "badge" false $labelDefs }}<span class="badge" title="{{ dig . "description" "" $labelDefs | html }}">{{ dig . "title" (upper .) $labelDefs | html }}</span>{{ end }}{{ end }}
+							{{- if .description }}<span class="desc-text">{{ .description | html }}</span>{{ end }}
+						</div>
 					</div>
 				</a>
 			{{- end }}
@@ -355,17 +357,19 @@
 			if (e.key === "/" && document.activeElement !== q) { e.preventDefault(); q.focus(); }
 		});
 
-		// Health dots: re-render the page in the background and copy over only the dots, so search
-		// and filters stay as they are. The same user gets the same tiles in the same order.
-		if (document.querySelector(".dot")) setInterval(async () => {
+		// Health: re-render the page in the background and copy over only each tile's status, so
+		// search and filters stay as they are. The same user gets the same tiles in the same order.
+		if (document.querySelector(".tile[data-health]")) setInterval(async () => {
 			if (document.hidden) return;
 			try {
 				const res = await fetch(location.href, { cache: "no-store" });
 				if (!res.ok) return;
 				const fresh = [...new DOMParser().parseFromString(await res.text(), "text/html").querySelectorAll(".tile")];
 				tiles.forEach((t, i) => {
-					const now = t.querySelector(".dot"), next = fresh[i]?.href === t.href && fresh[i].querySelector(".dot");
-					if (now && next) for (const a of ["data-health", "aria-label", "title"]) now.setAttribute(a, next.getAttribute(a));
+					const next = fresh[i];
+					if (next?.href !== t.href || !next.dataset.health) return;
+					t.dataset.health = next.dataset.health;
+					t.querySelector(".desc").innerHTML = next.querySelector(".desc").innerHTML;
 				});
 			} catch (e) {}
 		}, 30000);

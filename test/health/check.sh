@@ -9,6 +9,7 @@ failed=0
 # One line per tile: its name and dot state ("none" without a dot).
 tiles() {
   curl -fsS "$url" | tr -d '\n' | awk 'BEGIN { RS = "</a>" } /class="tile"/ {
+    $0 = substr($0, index($0, "<a class=\"tile\""))
     state = "none"
     if (match($0, /data-health="[a-z]+"/)) state = substr($0, RSTART + 13, RLENGTH - 14)
     match($0, /<div class="name">[^<]*/)
