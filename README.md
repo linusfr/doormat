@@ -58,7 +58,9 @@ start.example.com {
 ## Development
 
 `source bin/activate-hermit` for the toolchain, then `just dev` (live reload) or
-`just dev-as "<groups>"`; `just --list` has the rest. Conventional Commits drive
+`just dev-as "<groups>"`; `just --list` has the rest. `just design` lints the page with
+[impeccable](https://github.com/pbakaus/impeccable); `just design-setup` adds its skill to
+Claude Code. Conventional Commits drive
 releases: a `feat` or `fix` on `main` tags a version and pushes the image.
 
 ## License

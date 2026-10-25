@@ -62,7 +62,8 @@
 		--border: rgba(20, 24, 40, 0.08);
 		--text: #14182a;
 		--muted: #5d6478;
-		--accent: #4f6bff;
+		/* Darkest surface it sits on is its own 14% tint; this keeps that above 4.5:1. */
+		--accent: #3651e0;
 		--shadow: 0 1px 2px rgba(20, 24, 40, 0.06), 0 8px 24px rgba(20, 24, 40, 0.06);
 		--shadow-hover: 0 2px 4px rgba(20, 24, 40, 0.08), 0 16px 40px rgba(20, 24, 40, 0.12);
 		color-scheme: light;
@@ -167,7 +168,7 @@
 	.meta { min-width: 0; }
 	.badge {
 		display: inline-block; margin-left: 8px; padding: 1px 6px; border-radius: 6px;
-		font-size: 10px; font-weight: 700; letter-spacing: 0.06em; vertical-align: 2px;
+		font-size: 11px; font-weight: 700; letter-spacing: 0.06em; vertical-align: 1px;
 		color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent);
 	}
 	.empty { color: var(--muted); margin-top: 48px; text-align: center; }

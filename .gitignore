@@ -1,6 +1,12 @@
 # `just dev` assembles the served tree here from site/ and examples/.
 dev/srv/
 test/srv/
+test/design-srv/
+
+# impeccable, installed per machine by `just design-setup` (its engine is a platform binary)
+.claude/skills/impeccable/
+.claude/agents/impeccable-*
+.claude/settings.local.json
 
 # AI context files
 CLAUDE.md

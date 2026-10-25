@@ -9,6 +9,7 @@
 
 image_name := "doormat"
 port := "8080"
+impeccable := "4.7.0"
 
 # ==========================================
 # DEV
@@ -54,6 +55,19 @@ test: (_tree "test/srv" "examples/apps.md" "examples/icons")
     done
     test/smoke.sh http://localhost:18080 http://localhost:18081
 
+# Design lint (impeccable): contrast, text size, touch targets and similar
+design: (_tree "test/design-srv" "examples/apps.md" "examples/icons")
+    #!/usr/bin/env bash
+    set -euo pipefail
+    trap 'kill $(jobs -p) 2>/dev/null; rm -rf test/design-srv' EXIT
+    DOORMAT_ROOT=test/design-srv DOORMAT_PORT=18082 DOORMAT_AUTH=off caddy run --config Caddyfile >/dev/null 2>&1 &
+    for _ in $(seq 50); do curl -fs -o /dev/null localhost:18082 && break; sleep 0.1; done
+    IMPECCABLE_NO_TELEMETRY=1 npx -y impeccable@{{impeccable}} detect http://localhost:18082
+
+# Install the impeccable skill and its edit hooks for Claude Code in this repo
+design-setup:
+    IMPECCABLE_NO_TELEMETRY=1 npx -y impeccable@{{impeccable}} install --project --providers=claude-code -y
+
 # Build the image
 image:
     docker build -t {{image_name}}:dev .
@@ -88,7 +102,7 @@ fmt-check:
     done
 
 # Everything CI runs that needs no Docker
-check: test
+check: test design
     caddy validate --config Caddyfile
     prek run --all-files
 
@@ -98,4 +112,4 @@ hooks:
     prek install --hook-type commit-msg
 
 clean:
-    rm -rf dev/srv test/srv
+    rm -rf dev/srv test/srv test/design-srv
