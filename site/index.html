@@ -398,7 +398,11 @@
 				if (e.key === "Escape") { q.value = ""; apply(); q.blur(); }
 			});
 			addEventListener("keydown", e => {
-				if (e.key === "/" && document.activeElement !== q) { e.preventDefault(); q.focus(); }
+				if (document.activeElement === q) return;
+				// Ctrl+F / Cmd+F jumps to the app search; pressed again from there, the browser's own
+				// find opens as usual.
+				const find = (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "f";
+				if (e.key === "/" || find) { e.preventDefault(); q.focus(); q.select(); }
 			});
 		}
 		apply();
