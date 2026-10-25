@@ -17,6 +17,8 @@
 {{- $labelDefs := $data.labels | default dict -}}
 {{- $categories := list -}}
 {{- $labels := dict -}}
+{{- $anyHealth := false -}}
+{{- $anyDown := false -}}
 {{- range $data.categories -}}
   {{- $cat := . -}}
   {{- $apps := list -}}
@@ -33,6 +35,10 @@
     {{- if $show -}}
       {{- $apps = append $apps $app -}}
       {{- range $app.labels -}}{{- $_ := set $labels . true -}}{{- end -}}
+      {{- with health $app.health $app.url -}}
+        {{- $anyHealth = true -}}
+        {{- if eq . "down" -}}{{- $anyDown = true -}}{{- end -}}
+      {{- end -}}
     {{- end -}}
   {{- end -}}
   {{- if $apps -}}{{- $categories = append $categories (dict "name" $cat.name "apps" $apps) -}}{{- end -}}
@@ -236,9 +242,13 @@
 			<kbd>/</kbd>
 		</label>
 	</header>
-	{{- if $labels }}
+	{{- if or $labels $anyHealth }}
 	<nav class="filters" aria-label="Filter by label">
 		<button class="chip" type="button" data-label="" data-state="all">All</button>
+		{{- /* Kept, but hidden, while nothing is down, so the background refresh can show it. */}}
+		{{- if $anyHealth }}
+		<button class="chip" type="button" data-label="health-down" data-state="neutral" title="Apps whose health check fails"{{ if not $anyDown }} hidden{{ end }}>Down</button>
+		{{- end }}
 		{{- range $key, $_ := $labels }}
 		<button class="chip" type="button" data-label="{{ $key | html }}" data-state="neutral" title="{{ dig $key "description" "" $labelDefs | html }}">{{ dig $key "title" (upper $key) $labelDefs | html }}</button>
 		{{- end }}
@@ -252,7 +262,7 @@
 			<div class="grid">
 			{{- range .apps }}
 				{{- $health := health .health .url }}
-				<a class="tile" href="{{ .url | html }}"{{ if $health }} data-health="{{ $health }}"{{ end }} data-labels="{{ join " " (.labels | default list) | html }}" data-search="{{ printf "%s %s" .name .description | lower | html }}">
+				<a class="tile" href="{{ .url | html }}"{{ if $health }} data-health="{{ $health }}"{{ end }} data-labels="{{ join " " (.labels | default list) | html }}{{ if eq $health "down" }} health-down{{ end }}" data-search="{{ printf "%s %s" .name .description | lower | html }}">
 					<div class="icon">
 						{{- if .icon }}
 						<img src="{{ if hasPrefix "http" .icon }}{{ .icon | html }}{{ else if contains "/" .icon }}/{{ .icon | html }}{{ else }}https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/{{ .icon | html }}.svg{{ end }}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:this.dataset.i}))" data-i="{{ substr 0 1 .name | html }}">
@@ -306,7 +316,7 @@
 		const tiles = [...document.querySelectorAll(".tile")];
 		const sections = [...document.querySelectorAll("main section")];
 		const nohit = document.getElementById("nohit");
-		const known = new Set(chips.map(c => c.dataset.label).filter(Boolean));
+		const known = new Set(chips.filter(c => !c.hidden).map(c => c.dataset.label).filter(Boolean));
 		// Each label cycles neutral -> include -> exclude -> neutral.
 		const include = new Set(), exclude = new Set();
 		try {
@@ -369,8 +379,16 @@
 					const next = fresh[i];
 					if (next?.href !== t.href || !next.dataset.health) return;
 					t.dataset.health = next.dataset.health;
+					t.dataset.labels = next.dataset.labels;
 					t.querySelector(".desc").innerHTML = next.querySelector(".desc").innerHTML;
 				});
+				// A filter on a chip that just disappeared would hide tiles with no way to undo it.
+				const down = chips.find(c => c.dataset.label === "health-down");
+				if (down) {
+					down.hidden = !tiles.some(t => t.dataset.health === "down");
+					if (down.hidden) { include.delete("health-down"); exclude.delete("health-down"); }
+				}
+				apply();
 			} catch (e) {}
 		}, 30000);
 	})();

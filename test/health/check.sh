@@ -38,4 +38,18 @@ for want in "${expected[@]}"; do
   fi
 done
 
+page=$(curl -fsS "$url")
+if grep -q 'data-label="health-down"[^>]*>Down<' <<<"$page" && ! grep -q 'data-label="health-down"[^>]*hidden' <<<"$page"; then
+  echo "ok   health: Down chip shows while apps are down"
+else
+  echo "FAIL health: Down chip missing or hidden"
+  failed=1
+fi
+if grep -q 'data-labels="[^"]*health-down' <<<"$page"; then
+  echo "ok   health: down tiles carry the health-down label"
+else
+  echo "FAIL health: no tile carries health-down"
+  failed=1
+fi
+
 exit $failed
