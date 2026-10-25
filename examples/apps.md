@@ -4,6 +4,8 @@
 # title:    page and home-screen title (default: Start).
 # links:    footer links, e.g. your auth portal's account and logout pages.
 # background: optional page background, a URL or a path under /srv (backgrounds/sky.jpg).
+# background_dim: 0 shows the photo as is, 1 only the page colour (default 0.45); text and
+#           tiles sit on frosted glass either way.
 # modules:  optional widgets under the date, in this order. Each names its module and takes
 #           that module's parameters:
 #           weather: where, as postcode + country, city (+ country), or latitude + longitude;

@@ -52,7 +52,7 @@ else
   failed=1
 fi
 
-if grep -q "class=\"has-background\" style=\"--background: url('/backgrounds/sky.jpg')\"" <<<"$page"; then
+if grep -q "class=\"has-background\" style=\"--background: url('/backgrounds/sky.jpg'); --dim: 0\"" <<<"$page"; then
   echo "ok   background path is served from /srv"
 else
   echo "FAIL background missing"

@@ -80,7 +80,8 @@ A module is one file in [`site/modules/`](site/modules). Adding one takes that f
 `import` at the top of `site/index.html`, and a branch where `.modules` renders.
 
 `background: backgrounds/sky.jpg` (mount `/srv/backgrounds`) or a URL puts an image behind the
-page, dimmed per theme so the tiles stay readable. `search: false` leaves out the search box.
+page; text and tiles sit on frosted glass so they stay readable. `background_dim` from `0` (the
+photo as is) to `1` dims it in the theme's colour; the default is `0.45`. `search: false` leaves out the search box.
 
 ## Development
 

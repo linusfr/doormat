@@ -1,5 +1,6 @@
 ---
 background: backgrounds/sky.jpg
+background_dim: 0
 search: false
 modules:
   - module: nope
