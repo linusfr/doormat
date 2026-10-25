@@ -1,4 +1,9 @@
 ---
+background: backgrounds/sky.jpg
+search: false
+modules:
+  - module: nope
+  - latitude: 1
 categories:
   - name: Health
     apps:

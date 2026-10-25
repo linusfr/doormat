@@ -5,6 +5,16 @@
 {{- $groupFormat := env "DOORMAT_GROUP_FORMAT" | default "%s:member" -}}
 {{- $data := (splitFrontMatter (include "/apps.md")).Meta -}}
 {{- $title := $data.title | default "Start" -}}
+{{- /* Modules: each one is a {{ define "module-<name>" }} in /modules/<name>.html. */ -}}
+{{- import "/modules/weather.html" -}}
+{{- /* A URL or a path under /srv (e.g. backgrounds/sky.jpg). It ends up inside CSS url(), so
+       anything that could end that string is refused rather than escaped. */ -}}
+{{- $background := "" -}}
+{{- with $data.background -}}
+  {{- if not (regexMatch "[\"'()\\\\\\s<>]" .) -}}
+    {{- $background = ternary . (printf "/%s" .) (contains "://" .) -}}
+  {{- end -}}
+{{- end -}}
 {{- $userGroups := list -}}
 {{- range splitList (env "DOORMAT_GROUPS_SEPARATOR" | default ",") (.Req.Header.Get $groupsHeader) -}}
   {{- $g := trim . -}}
@@ -61,6 +71,8 @@
 <style>
 	:root {
 		--bg: #f4f5f8;
+		/* Over a background image: keeps text and tiles readable whatever the photo. */
+		--scrim: rgba(244, 245, 248, 0.6);
 		--bg-glow: radial-gradient(1200px 600px at 10% -10%, #dfe6ff 0%, transparent 60%),
 			radial-gradient(900px 500px at 110% 10%, #e9ddff 0%, transparent 55%);
 		--card: rgba(255, 255, 255, 0.78);
@@ -78,6 +90,7 @@
 	@media (prefers-color-scheme: dark) {
 		:root {
 			--bg: #0d0f17;
+			--scrim: rgba(13, 15, 23, 0.62);
 			--bg-glow: radial-gradient(1200px 600px at 10% -10%, #1c2547 0%, transparent 60%),
 				radial-gradient(900px 500px at 110% 10%, #2a1d47 0%, transparent 55%);
 			--card: rgba(255, 255, 255, 0.045);
@@ -102,6 +115,10 @@
 		font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
 		-webkit-font-smoothing: antialiased;
 	}
+	body.has-background {
+		background: linear-gradient(var(--scrim), var(--scrim)), var(--background) center / cover no-repeat, var(--bg);
+		background-attachment: fixed;
+	}
 	.wrap {
 		max-width: 1120px;
 		margin: 0 auto;
@@ -117,6 +134,10 @@
 	}
 	.greeting { font-size: clamp(26px, 4vw, 36px); font-weight: 650; letter-spacing: -0.02em; margin: 0; }
 	.date { color: var(--muted); margin: 4px 0 0; }
+	.modules { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 6px; color: var(--muted); font-size: 14px; }
+	.module { display: inline-flex; align-items: center; gap: 6px; }
+	.weather-icon { display: inline-flex; color: var(--text); }
+	.weather-icon[data-icon="sun"] { color: #d97706; }
 	.search {
 		position: relative;
 		flex: 0 1 320px;
@@ -136,6 +157,7 @@
 		backdrop-filter: blur(12px);
 		transition: border-color 0.15s, box-shadow 0.15s;
 	}
+	.search input::placeholder { color: var(--muted); opacity: 1; }
 	.search input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); }
 	/* Above the input: its backdrop-filter starts a stacking context that would paint over the icon. */
 	.search svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); z-index: 1; pointer-events: none; }
@@ -229,18 +251,29 @@
 	@media (prefers-reduced-motion: reduce) { .tile { transition: none; } }
 </style>
 </head>
-<body>
+<body{{ if $background }} class="has-background" style="--background: url('{{ $background | html }}')"{{ end }}>
 <div class="wrap">
 	<header>
 		<div>
 			<h1 class="greeting"><span id="hello">Hello</span>{{ if $name }}, {{ $name | html }}{{ end }}</h1>
 			<p class="date" id="date"></p>
+			{{- with $data.modules }}
+			<div class="modules">
+				{{- range . }}
+				{{- if eq (toString .module) "weather" }}{{ template "module-weather" . }}
+				{{- else }}<!-- doormat: unknown module {{ .module | default "" | html }} -->
+				{{- end }}
+				{{- end }}
+			</div>
+			{{- end }}
 		</div>
+		{{- if ne (toString $data.search) "false" }}
 		<label class="search">
 			<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
 			<input id="q" type="search" placeholder="Search apps" autocomplete="off" aria-label="Search apps">
 			<kbd>/</kbd>
 		</label>
+		{{- end }}
 	</header>
 	{{- if or $labels $anyHealth }}
 	<nav class="filters" aria-label="Filter by label">
@@ -327,7 +360,7 @@
 		} catch (e) {}
 
 		const apply = () => {
-			const term = q.value.trim().toLowerCase();
+			const term = q ? q.value.trim().toLowerCase() : "";
 			tiles.forEach(t => {
 				const labels = t.dataset.labels.split(" ").filter(Boolean);
 				// Search looks at every app; otherwise a tile needs one included label (if any are
@@ -357,15 +390,18 @@
 			try { localStorage.setItem("labelFilter", JSON.stringify({ include: [...include], exclude: [...exclude] })); } catch (e) {}
 			apply();
 		}));
-		q.addEventListener("input", apply);
-		q.addEventListener("keydown", e => {
-			if (e.key === "Enter") { const first = tiles.find(t => !t.hidden); if (first) location.href = first.href; }
-			if (e.key === "Escape") { q.value = ""; apply(); q.blur(); }
-		});
+		// search: false in apps.md leaves the box out entirely.
+		if (q) {
+			q.addEventListener("input", apply);
+			q.addEventListener("keydown", e => {
+				if (e.key === "Enter") { const first = tiles.find(t => !t.hidden); if (first) location.href = first.href; }
+				if (e.key === "Escape") { q.value = ""; apply(); q.blur(); }
+			});
+			addEventListener("keydown", e => {
+				if (e.key === "/" && document.activeElement !== q) { e.preventDefault(); q.focus(); }
+			});
+		}
 		apply();
-		addEventListener("keydown", e => {
-			if (e.key === "/" && document.activeElement !== q) { e.preventDefault(); q.focus(); }
-		});
 
 		// Health: re-render the page in the background and copy over only each tile's status, so
 		// search and filters stay as they are. The same user gets the same tiles in the same order.

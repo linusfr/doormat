@@ -63,6 +63,24 @@ the same host, a full URL checks anything else, such as an internal address. Any
 HTTP 500 within 5 seconds counts as up, so login redirects and 401s do too. doormat runs the
 checks itself; the page only shows their last result. While any app is down, a Down chip filters for them.
 
+## Modules and background
+
+Widgets go under the date, in the order of `modules:` in `apps.md`. Each entry names its module
+and takes that module's parameters:
+
+```yaml
+modules:
+  - module: weather   # Open-Meteo, fetched by the browser; no API key
+    postcode: "10115" # or city: Hamburg, or latitude/longitude
+    country: de
+```
+
+A module is one file in [`site/modules/`](site/modules). Adding one takes that file, its
+`import` at the top of `site/index.html`, and a branch where `.modules` renders.
+
+`background: backgrounds/sky.jpg` (mount `/srv/backgrounds`) or a URL puts an image behind the
+page, dimmed per theme so the tiles stay readable. `search: false` leaves out the search box.
+
 ## Development
 
 `source bin/activate-hermit` for the toolchain, then `just dev` (live reload) or

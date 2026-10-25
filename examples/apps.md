@@ -3,6 +3,13 @@
 #
 # title:    page and home-screen title (default: Start).
 # links:    footer links, e.g. your auth portal's account and logout pages.
+# background: optional page background, a URL or a path under /srv (backgrounds/sky.jpg).
+# modules:  optional widgets under the date, in this order. Each names its module and takes
+#           that module's parameters:
+#           weather: where, as postcode + country, city (+ country), or latitude + longitude;
+#           name (label, default: the place found); unit (celsius or fahrenheit). Fetched by the
+#           browser from open-meteo.com; postcodes are looked up at zippopotam.us.
+# search:   false leaves out the search box.
 # labels:   filter chips. badge: true also shows the label on the tile. requires: a group the
 #           user needs on top of the app's own group before the tile shows (DOORMAT_AUTH=headers).
 # apps:
@@ -13,6 +20,11 @@
 #   health: marks the tile when the app is down. true checks url, a path checks that path on url's host, or a
 #           full URL (e.g. an internal address). Any response below HTTP 500 counts as up.
 title: Start
+
+modules:
+  - module: weather
+    postcode: "10115"
+    country: de
 
 links:
   - name: Account

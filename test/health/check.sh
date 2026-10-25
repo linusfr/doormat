@@ -52,4 +52,24 @@ else
   failed=1
 fi
 
+if grep -q "class=\"has-background\" style=\"--background: url('/backgrounds/sky.jpg')\"" <<<"$page"; then
+  echo "ok   background path is served from /srv"
+else
+  echo "FAIL background missing"
+  failed=1
+fi
+if grep -q '<!-- doormat: unknown module nope -->' <<<"$page" && grep -q '<!-- doormat: unknown module  -->' <<<"$page"; then
+  echo "ok   unknown and nameless modules are skipped, not fatal"
+else
+  echo "FAIL unknown module handling"
+  failed=1
+fi
+
+if grep -q 'id="q"' <<<"$page"; then
+  echo "FAIL search: false still renders the search box"
+  failed=1
+else
+  echo "ok   search: false leaves out the search box"
+fi
+
 exit $failed

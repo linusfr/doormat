@@ -2,7 +2,7 @@
 root * {$DOORMAT_ROOT:/srv}
 
 # Icons are public so home-screen shortcuts can load them without a session.
-@static path /favicon.svg /apple-touch-icon.png /icons/*
+@static path /favicon.svg /apple-touch-icon.png /icons/* /backgrounds/*
 handle @static {
 	header Cache-Control "public, max-age=86400"
 	file_server

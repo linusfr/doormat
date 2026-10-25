@@ -50,7 +50,7 @@ _tree dir apps icons:
     #!/usr/bin/env bash
     set -euo pipefail
     rm -rf {{dir}} && mkdir -p {{dir}}
-    for f in index.html favicon.svg apple-touch-icon.png; do ln -s "$PWD/site/$f" {{dir}}/$f; done
+    for f in index.html favicon.svg apple-touch-icon.png modules; do ln -s "$PWD/site/$f" {{dir}}/$f; done
     ln -s "$(cd "$(dirname {{apps}})" && pwd)/$(basename {{apps}})" {{dir}}/apps.md
     ln -s "$(cd {{icons}} && pwd)" {{dir}}/icons
 

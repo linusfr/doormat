@@ -57,6 +57,9 @@ body=$(page "$headers_url/apps.md" -H "Remote-Groups: immich:member")
 reject "apps.md is never served" "$body" 'categories:'
 
 body=$(page "$off_url")
+expect "weather module renders its parameters" "$body" 'data-postcode="10115" data-country="de" data-city="" data-latitude="" data-longitude="" data-unit="celsius" data-name=""'
+expect "search box by default" "$body" 'id="q"'
+reject "no background unless configured" "$body" 'class="has-background"'
 expect "auth off shows every app" "$body" 'href="https://paperless.example.com"'
 expect "auth off ignores label requirements" "$body" '192.168.1.10:8096'
 

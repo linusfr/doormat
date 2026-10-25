@@ -1,0 +1,96 @@
+{{- /* Weather from Open-Meteo (no API key). Location, one of: postcode + country (zippopotam.us),
+       city with optional country (Open-Meteo geocoding), or latitude + longitude. Also: name (label,
+       default: the place found), unit: celsius (default) or fahrenheit. The browser fetches it, so a
+       failed lookup or fetch only hides the module. */ -}}
+{{- define "module-weather" }}
+<div class="module weather" data-postcode="{{ .postcode | default "" | html }}" data-country="{{ .country | default "" | html }}" data-city="{{ .city | default "" | html }}" data-latitude="{{ .latitude | default "" | html }}" data-longitude="{{ .longitude | default "" | html }}" data-unit="{{ .unit | default "celsius" | html }}" data-name="{{ .name | default "" | html }}" hidden>
+	<span class="weather-icon" aria-hidden="true"></span>
+	<span class="weather-text"></span>
+</div>
+<script>
+	(() => {
+		const icons = {
+			sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+			moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+			partly: '<path d="M8 3v1.5M3.5 8H2M4.5 4.5l1 1M12.5 4.5l-1 1"/><path d="M5.5 10.5a4 4 0 0 1 6.9-3.2"/><path d="M8 20h9a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.4 1.5A3.3 3.3 0 0 0 8 20z"/>',
+			cloud: '<path d="M7 19h10a4.5 4.5 0 0 0 .4-9A6 6 0 0 0 6 11.5 3.8 3.8 0 0 0 7 19z"/>',
+			rain: '<path d="M7 15h10a4.5 4.5 0 0 0 .4-9A6 6 0 0 0 6 7.5 3.8 3.8 0 0 0 7 15z"/><path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3"/>',
+			snow: '<path d="M7 15h10a4.5 4.5 0 0 0 .4-9A6 6 0 0 0 6 7.5 3.8 3.8 0 0 0 7 15z"/><path d="M8 19h.01M12 21h.01M16 19h.01M10 22h.01M14 18h.01"/>',
+			storm: '<path d="M7 15h10a4.5 4.5 0 0 0 .4-9A6 6 0 0 0 6 7.5 3.8 3.8 0 0 0 7 15z"/><path d="M12.5 15l-2 3.5h3l-2 3.5"/>',
+			fog: '<path d="M4 9h16M3 13h18M6 17h12"/>',
+		};
+		// WMO weather codes, as Open-Meteo reports them.
+		const describe = (code, day) =>
+			code === 0 ? [day ? "sun" : "moon", "Clear"]
+			: code <= 2 ? [day ? "partly" : "cloud", "Partly cloudy"]
+			: code === 3 ? ["cloud", "Overcast"]
+			: code <= 48 ? ["fog", "Fog"]
+			: code <= 57 ? ["rain", "Drizzle"]
+			: code <= 67 ? ["rain", "Rain"]
+			: code <= 77 ? ["snow", "Snow"]
+			: code <= 82 ? ["rain", "Showers"]
+			: code <= 86 ? ["snow", "Snow showers"]
+			: ["storm", "Thunderstorm"];
+
+		const cached = (key, maxAge) => {
+			try {
+				const c = JSON.parse(localStorage.getItem(key) || "null");
+				if (c && Date.now() - c.at < maxAge) return c.data;
+			} catch (e) {}
+		};
+		const store = (key, data) => { try { localStorage.setItem(key, JSON.stringify({ at: Date.now(), data })); } catch (e) {} };
+		const json = async url => { const res = await fetch(url); if (!res.ok) throw new Error(res.status); return res.json(); };
+
+		// A place does not move, so a lookup is kept for good.
+		const locate = async ({ postcode, country, city, latitude, longitude }) => {
+			if (latitude && longitude) return { latitude, longitude, place: "" };
+			const key = `doormat-place:${postcode}|${city}|${country}`;
+			const hit = cached(key, Infinity);
+			if (hit) return hit;
+			let found;
+			if (postcode && country) {
+				const p = (await json(`https://api.zippopotam.us/${encodeURIComponent(country.toLowerCase())}/${encodeURIComponent(postcode)}`)).places[0];
+				found = { latitude: p.latitude, longitude: p.longitude, place: p["place name"] };
+			} else if (city) {
+				const params = { name: city, count: "1" };
+				if (country) params.countryCode = country.toUpperCase();
+				const r = (await json("https://geocoding-api.open-meteo.com/v1/search?" + new URLSearchParams(params))).results[0];
+				found = { latitude: r.latitude, longitude: r.longitude, place: r.name };
+			} else return null;
+			store(key, found);
+			return found;
+		};
+
+		document.querySelectorAll(".weather:not([data-init])").forEach(async el => {
+			el.dataset.init = "";
+			const { unit, name } = el.dataset;
+			let where;
+			try { where = await locate(el.dataset); } catch (e) {}
+			if (!where) return;
+			const { latitude, longitude } = where;
+			const label = name || where.place;
+			const key = `doormat-weather:${latitude},${longitude},${unit}`;
+			let data = cached(key, 15 * 60 * 1000);
+			if (!data) {
+				try {
+					const url = "https://api.open-meteo.com/v1/forecast?" + new URLSearchParams({
+						latitude, longitude, timezone: "auto", forecast_days: "1", temperature_unit: unit,
+						current: "temperature_2m,weather_code,is_day",
+						daily: "temperature_2m_max,temperature_2m_min",
+					});
+					data = await json(url);
+					store(key, data);
+				} catch (e) { return; }
+			}
+			const [icon, text] = describe(data.current.weather_code, data.current.is_day);
+			const t = v => Math.round(v) + "°";
+			el.querySelector(".weather-icon").innerHTML =
+				`<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${icons[icon]}</svg>`;
+			el.querySelector(".weather-icon").dataset.icon = icon;
+			el.querySelector(".weather-text").textContent =
+				`${t(data.current.temperature_2m)} ${text}${label ? " in " + label : ""} · H ${t(data.daily.temperature_2m_max[0])} L ${t(data.daily.temperature_2m_min[0])}`;
+			el.hidden = false;
+		});
+	})();
+</script>
+{{- end }}
