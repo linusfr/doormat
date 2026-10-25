@@ -75,6 +75,8 @@ test: build (_tree "test/srv" "examples/apps.md" "examples/icons") (_tree "test/
     DOORMAT_ROOT=test/srv DOORMAT_PORT=18080 dist/caddy run --config Caddyfile >/dev/null 2>&1 &
     DOORMAT_ROOT=test/srv DOORMAT_PORT=18081 DOORMAT_AUTH=off dist/caddy run --config Caddyfile >/dev/null 2>&1 &
     dist/caddy run --config test/health/targets.Caddyfile >/dev/null 2>&1 &
+    # Targets first: doormat checks once at start, and a target not yet listening reads as down.
+    for _ in $(seq 50); do curl -fs -o /dev/null localhost:18310 && break; sleep 0.1; done
     DOORMAT_ROOT=test/health-srv DOORMAT_PORT=18083 DOORMAT_AUTH=off DOORMAT_HEALTH_INTERVAL=1s \
       dist/caddy run --config Caddyfile >/dev/null 2>&1 &
     for p in 18080 18081 18083; do

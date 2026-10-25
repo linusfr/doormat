@@ -17,13 +17,19 @@ tiles() {
   }'
 }
 
+expected=("Plain up" "Locked up" "Login up" "Broken down" "Gone down" "Unchecked none")
+
+# Retry until every state matches: a round that started before a target was ready corrects
+# itself one interval later.
 for _ in $(seq 50); do
   page=$(tiles)
-  grep -q unknown <<<"$page" || break
+  all=1
+  for want in "${expected[@]}"; do grep -qx "$want" <<<"$page" || all=0; done
+  [ $all = 1 ] && break
   sleep 0.2
 done
 
-for want in "Plain up" "Locked up" "Login up" "Broken down" "Gone down" "Unchecked none"; do
+for want in "${expected[@]}"; do
   if grep -qx "$want" <<<"$page"; then
     echo "ok   health: $want"
   else
