@@ -82,8 +82,8 @@ jobs:
         uses: go-semantic-release/action@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          # The changelog lives in the GitHub release; main is protected against bot pushes.
           custom-arguments: '--provider-opt strip_v_tag_prefix=true'
-          changelog-file: CHANGELOG.md
 
       # The plugin is cross-compiled in the Dockerfile, so arm64 needs no emulation.
       - name: Publish the image
@@ -100,13 +100,3 @@ jobs:
             --label org.opencontainers.image.licenses=MIT \
             -t "$image:$VERSION" -t "$image:latest" \
             --push
-
-      - name: Commit the changelog
-        env:
-          VERSION: ${{ needs.checks.outputs.version }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md
-          git diff --cached --quiet || git commit -m "chore(release): ${VERSION} [skip ci]"
-          git push
