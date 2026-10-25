@@ -22,7 +22,7 @@ repos:
   # Conventional commits are load-bearing here: go-semantic-release derives
   # every version number from them.
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.18.0
+    rev: v4.19.2
     hooks:
       - id: commitizen
         stages: [commit-msg]
