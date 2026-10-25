@@ -9,7 +9,8 @@
 
 image_name := "doormat"
 port := "8080"
-impeccable := "4.7.0"
+# Pinned in package.json, where Dependabot can see it.
+impeccable := `jq -r .devDependencies.impeccable package.json`
 
 # ==========================================
 # DEV
