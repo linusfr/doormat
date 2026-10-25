@@ -25,6 +25,15 @@ updates:
       prefix: chore
       include: scope
 
+  # The plugin ships in the image, so its dependencies are a release too.
+  - package-ecosystem: gomod
+    directory: /plugin
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: fix
+      include: scope
+
   - package-ecosystem: npm
     directory: /
     schedule:

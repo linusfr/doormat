@@ -2,6 +2,10 @@
 dev/srv/
 test/srv/
 test/design-srv/
+test/health-srv/
+
+# `just build`
+dist/
 
 # impeccable, installed per machine by `just design-setup` (its engine is a platform binary)
 .claude/skills/impeccable/

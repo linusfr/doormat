@@ -53,7 +53,15 @@ start.example.com {
 | `DOORMAT_GROUPS_SEPARATOR` | `,` | Authentik: `\|` |
 | `DOORMAT_GROUP_FORMAT` | `%s:member` | `%s` is the app's slug |
 | `DOORMAT_NAME_HEADERS` | `Remote-Name,Remote-User` | First non-empty one greets |
+| `DOORMAT_HEALTH_INTERVAL` | `60s` | How often `health` targets are checked |
 | `DOORMAT_PORT` | `8080` | |
+
+## Health
+
+Add `health` to a tile for a status dot: `true` checks its `url`, `/path` checks that path on
+the same host, a full URL checks anything else, such as an internal address. Any response below
+HTTP 500 within 5 seconds counts as up, so login redirects and 401s do too. doormat runs the
+checks itself; the page only shows their last result.
 
 ## Development
 

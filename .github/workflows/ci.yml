@@ -85,8 +85,7 @@ jobs:
           custom-arguments: '--provider-opt strip_v_tag_prefix=true'
           changelog-file: CHANGELOG.md
 
-      # The Dockerfile has no RUN step, so building for arm64 needs no emulation:
-      # every layer is the multi-arch caddy base plus copied files.
+      # The plugin is cross-compiled in the Dockerfile, so arm64 needs no emulation.
       - name: Publish the image
         env:
           VERSION: ${{ needs.checks.outputs.version }}

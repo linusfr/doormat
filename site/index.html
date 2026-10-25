@@ -143,6 +143,7 @@
 	}
 	.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
 	.tile {
+		position: relative;
 		display: flex; align-items: center; gap: 14px;
 		padding: 16px;
 		border-radius: 16px;
@@ -171,6 +172,12 @@
 		font-size: 11px; font-weight: 700; letter-spacing: 0.06em; vertical-align: 1px;
 		color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent);
 	}
+	.dot {
+		position: absolute; top: 12px; right: 12px; width: 8px; height: 8px; border-radius: 50%;
+		background: var(--muted); opacity: 0.5;
+	}
+	.dot[data-health="up"] { background: #16a34a; opacity: 1; }
+	.dot[data-health="down"] { background: #d4495b; opacity: 1; box-shadow: 0 0 0 3px color-mix(in srgb, #d4495b 25%, transparent); }
 	.empty { color: var(--muted); margin-top: 48px; text-align: center; }
 	footer { margin-top: 56px; display: flex; gap: 20px; justify-content: center; font-size: 13px; }
 	footer a { color: var(--muted); text-decoration: none; }
@@ -252,6 +259,9 @@
 						<span>{{ substr 0 1 .name | html }}</span>
 						{{- end }}
 					</div>
+					{{- with health .health .url }}
+					<span class="dot" data-health="{{ . }}" role="img" aria-label="{{ if eq . "up" }}Up{{ else if eq . "down" }}Down{{ else }}Not checked yet{{ end }}" title="{{ if eq . "up" }}Up{{ else if eq . "down" }}Down{{ else }}Not checked yet{{ end }}"></span>
+					{{- end }}
 					<div class="meta">
 						<div class="name">{{ .name | html }}{{ range .labels }}{{ if dig . "badge" false $labelDefs }}<span class="badge" title="{{ dig . "description" "" $labelDefs | html }}">{{ dig . "title" (upper .) $labelDefs | html }}</span>{{ end }}{{ end }}</div>
 						{{- if .description }}<div class="desc">{{ .description | html }}</div>{{ end }}
@@ -344,6 +354,21 @@
 		addEventListener("keydown", e => {
 			if (e.key === "/" && document.activeElement !== q) { e.preventDefault(); q.focus(); }
 		});
+
+		// Health dots: re-render the page in the background and copy over only the dots, so search
+		// and filters stay as they are. The same user gets the same tiles in the same order.
+		if (document.querySelector(".dot")) setInterval(async () => {
+			if (document.hidden) return;
+			try {
+				const res = await fetch(location.href, { cache: "no-store" });
+				if (!res.ok) return;
+				const fresh = [...new DOMParser().parseFromString(await res.text(), "text/html").querySelectorAll(".tile")];
+				tiles.forEach((t, i) => {
+					const now = t.querySelector(".dot"), next = fresh[i]?.href === t.href && fresh[i].querySelector(".dot");
+					if (now && next) for (const a of ["data-health", "aria-label", "title"]) now.setAttribute(a, next.getAttribute(a));
+				});
+			} catch (e) {}
+		}, 30000);
 	})();
 </script>
 {{- if env "DOORMAT_DEV" }}

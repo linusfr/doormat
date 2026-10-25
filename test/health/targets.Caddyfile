@@ -1,0 +1,13 @@
+# Targets for test/health/apps.md.
+{
+	admin off
+	auto_https off
+	persist_config off
+}
+
+:18310 {
+	respond /fail 500
+	respond /locked 401
+	redir /login https://auth.example.com/
+	respond 200
+}

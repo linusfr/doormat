@@ -13,6 +13,13 @@ handle {
 	header Cache-Control "private, no-store"
 	# Every path renders index.html, so apps.md itself is never served.
 	rewrite * /index.html
-	templates
+	templates {
+		extensions {
+			doormat_health {
+				apps {$DOORMAT_ROOT:/srv}/apps.md
+				interval {$DOORMAT_HEALTH_INTERVAL:60s}
+			}
+		}
+	}
 	file_server
 }

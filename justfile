@@ -13,14 +13,37 @@ port := "8080"
 impeccable := `jq -r .devDependencies.impeccable package.json`
 
 # ==========================================
+# BUILD
+# ==========================================
+
+# Caddy with the health plugin, at the version the image uses
+build:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # xcaddy recompiles every time; skip it when nothing it builds from has changed.
+    if [ -x dist/caddy ] && [ -z "$(find plugin Dockerfile -newer dist/caddy)" ]; then exit 0; fi
+    version=$(sed -n 's/^FROM caddy:\([0-9.]*\)-alpine$/\1/p' Dockerfile)
+    xcaddy build "v$version" --output dist/caddy --with github.com/linusfr/doormat/plugin=./plugin
+
+# Vet and unit-test the plugin
+plugin-test:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd plugin
+    unformatted=$(gofmt -l .)
+    if [ -n "$unformatted" ]; then echo "needs gofmt:"; echo "$unformatted"; exit 1; fi
+    go vet ./...
+    go test -race ./...
+
+# ==========================================
 # DEV
 # ==========================================
 
 # Live reload, every tile visible
-dev apps="examples/apps.md" icons="examples/icons": (_tree "dev/srv" apps icons) (_serve "dev/srv" "off" "" "")
+dev apps="examples/apps.md" icons="examples/icons": build (_tree "dev/srv" apps icons) (_serve "dev/srv" "off" "" "")
 
 # Live reload, as a user with these groups
-dev-as groups="immich:member,grafana:member" name="Ada" apps="examples/apps.md" icons="examples/icons": (_tree "dev/srv" apps icons) (_serve "dev/srv" "headers" groups name)
+dev-as groups="immich:member,grafana:member" name="Ada" apps="examples/apps.md" icons="examples/icons": build (_tree "dev/srv" apps icons) (_serve "dev/srv" "headers" groups name)
 
 # Symlinks, so edits to site/ and apps.md show up live
 _tree dir apps icons:
@@ -38,30 +61,34 @@ _serve dir auth groups name:
     echo "doormat on $url (auth: {{auth}}) — edits to site/ and apps.md reload the browser"
     ( sleep 1; {{ if os() == "macos" { "open" } else { "xdg-open" } }} "$url" >/dev/null 2>&1 || true ) &
     DOORMAT_DEV=1 DOORMAT_AUTH={{auth}} DOORMAT_ROOT={{dir}} DOORMAT_PORT={{port}} \
-      DEV_GROUPS="{{groups}}" DEV_NAME="{{name}}" caddy run --config dev/Caddyfile
+      DEV_GROUPS="{{groups}}" DEV_NAME="{{name}}" dist/caddy run --config dev/Caddyfile
 
 # ==========================================
 # TEST
 # ==========================================
 
-# Smoke test against the local caddy binary
-test: (_tree "test/srv" "examples/apps.md" "examples/icons")
+# Smoke test against the local build
+test: build (_tree "test/srv" "examples/apps.md" "examples/icons") (_tree "test/health-srv" "test/health/apps.md" "examples/icons")
     #!/usr/bin/env bash
     set -euo pipefail
-    trap 'kill $(jobs -p) 2>/dev/null; rm -rf test/srv' EXIT
-    DOORMAT_ROOT=test/srv DOORMAT_PORT=18080 caddy run --config Caddyfile >/dev/null 2>&1 &
-    DOORMAT_ROOT=test/srv DOORMAT_PORT=18081 DOORMAT_AUTH=off caddy run --config Caddyfile >/dev/null 2>&1 &
-    for p in 18080 18081; do
+    trap 'kill $(jobs -p) 2>/dev/null; rm -rf test/srv test/health-srv' EXIT
+    DOORMAT_ROOT=test/srv DOORMAT_PORT=18080 dist/caddy run --config Caddyfile >/dev/null 2>&1 &
+    DOORMAT_ROOT=test/srv DOORMAT_PORT=18081 DOORMAT_AUTH=off dist/caddy run --config Caddyfile >/dev/null 2>&1 &
+    dist/caddy run --config test/health/targets.Caddyfile >/dev/null 2>&1 &
+    DOORMAT_ROOT=test/health-srv DOORMAT_PORT=18083 DOORMAT_AUTH=off DOORMAT_HEALTH_INTERVAL=1s \
+      dist/caddy run --config Caddyfile >/dev/null 2>&1 &
+    for p in 18080 18081 18083; do
       for _ in $(seq 50); do curl -fs -o /dev/null localhost:$p && break; sleep 0.1; done
     done
     test/smoke.sh http://localhost:18080 http://localhost:18081
+    test/health/check.sh http://localhost:18083
 
 # Design lint (impeccable): contrast, text size, touch targets and similar
-design: (_tree "test/design-srv" "examples/apps.md" "examples/icons")
+design: build (_tree "test/design-srv" "examples/apps.md" "examples/icons")
     #!/usr/bin/env bash
     set -euo pipefail
     trap 'kill $(jobs -p) 2>/dev/null; rm -rf test/design-srv' EXIT
-    DOORMAT_ROOT=test/design-srv DOORMAT_PORT=18082 DOORMAT_AUTH=off caddy run --config Caddyfile >/dev/null 2>&1 &
+    DOORMAT_ROOT=test/design-srv DOORMAT_PORT=18082 DOORMAT_AUTH=off dist/caddy run --config Caddyfile >/dev/null 2>&1 &
     for _ in $(seq 50); do curl -fs -o /dev/null localhost:18082 && break; sleep 0.1; done
     IMPECCABLE_NO_TELEMETRY=1 npx -y impeccable@{{impeccable}} detect http://localhost:18082
 
@@ -103,8 +130,8 @@ fmt-check:
     done
 
 # Everything CI runs that needs no Docker
-check: test design
-    caddy validate --config Caddyfile
+check: plugin-test test design
+    dist/caddy validate --config Caddyfile
     prek run --all-files
 
 # Install the git hooks
@@ -113,4 +140,4 @@ hooks:
     prek install --hook-type commit-msg
 
 clean:
-    rm -rf dev/srv test/srv test/design-srv
+    rm -rf dist dev/srv test/srv test/design-srv test/health-srv
